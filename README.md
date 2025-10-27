@@ -1,0 +1,1 @@
+# spotmyenergy-partner-api
