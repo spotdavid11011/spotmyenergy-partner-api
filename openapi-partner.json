@@ -1,0 +1,238 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "SpotmyEnergy Partner API",
+    "version": "1.0.0",
+    "description": "Public API for partners integrating SpotmyEnergy offers and projects.\n\n**Quick start**\n1) Obtain a sandbox API key from SpotmyEnergy.\n2) Create an electricity/metering offer to show pricing to end customers.\n3) Create a project (Auftrag) after the offer is accepted.\n\n**Auth**: Bearer token (JWT). Send `Authorization: Bearer <token>`.\n**Rate limits**: Returned via `X-RateLimit-*` headers (contact support for higher limits).\n**Support**: api-support@spotmyenergy.com"
+  },
+  "servers": [
+    { "url": "https://api.spotmyenergy.com/partner/v1", "description": "Production" },
+    { "url": "https://sandbox.spotmyenergy.com/partner/v1", "description": "Sandbox" }
+  ],
+  "tags": [
+    { "name": "Contracts", "description": "Create electricity + metering offers (quotes)" },
+    { "name": "Projects",  "description": "Create projects (Aufträge) after offer acceptance" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "schemas": {
+      "BadRequestError": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "number", "example": 400 },
+          "success": { "type": "boolean", "example": false },
+          "message_en": { "type": "string", "example": "Invalid request" },
+          "message_de": { "type": "string", "example": "Ungültige Anfrage" },
+          "correlationId": { "type": "string", "example": "650e842b" }
+        },
+        "required": ["code", "success", "message_en", "message_de", "correlationId"]
+      },
+      "UnauthorizedError": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "number", "example": 401 },
+          "success": { "type": "boolean", "example": false },
+          "message_en": { "type": "string", "example": "Unauthorized" },
+          "message_de": { "type": "string", "example": "Nicht autorisiert" },
+          "correlationId": { "type": "string", "example": "650e842b" }
+        },
+        "required": ["code", "success", "message_en", "message_de", "correlationId"]
+      },
+      "GenericSuccessId": {
+        "type": "object",
+        "properties": {
+          "correlationId": { "type": "string", "example": "650e842b" },
+          "data": {
+            "type": "object",
+            "properties": { "id": { "type": "string", "example": "PRJ-12345" } },
+            "required": ["id"]
+          }
+        },
+        "required": ["correlationId", "data"]
+      },
+      "CreateOfferRequest": {
+        "type": "object",
+        "properties": {
+          "isParagraph14aCase": { "type": "boolean", "description": "Falls 14a EnWG anwendbar ist", "examples": [true, false] },
+          "expectedPowerConsumptionKwh": { "type": "number", "minimum": 0, "maximum": 50000, "example": 3500 },
+          "peakSolarPower": { "type": "number", "minimum": 0, "maximum": 50, "description": "kWp", "examples": [5, 10] },
+          "shippingAddress": {
+            "type": "object",
+            "properties": {
+              "street": { "type": "string", "minLength": 1, "example": "Hafenstraße" },
+              "houseNumber": { "type": "integer", "minimum": 1, "example": 4 },
+              "houseNumberSuffix": { "type": "string", "example": "a" },
+              "zipCode": { "type": "string", "minLength": 1, "example": "51063" },
+              "city": { "type": "string", "minLength": 1, "example": "Köln" }
+            },
+            "required": ["street", "houseNumber", "zipCode", "city"]
+          }
+        },
+        "required": ["isParagraph14aCase", "expectedPowerConsumptionKwh", "shippingAddress"]
+      },
+      "CreateOfferResponse": {
+        "type": "object",
+        "properties": {
+          "correlationId": { "type": "string", "example": "650e842b" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "metering": {
+                "type": "object",
+                "properties": {
+                  "entgeltSmartMeter": { "type": "number", "example": 50.0 },
+                  "entgeltSteuerbarkeit": { "type": "number", "example": 0.0 }
+                },
+                "required": ["entgeltSmartMeter", "entgeltSteuerbarkeit"]
+              },
+              "electricity": {
+                "type": "object",
+                "properties": {
+                  "aggregatedGrossPrices": {
+                    "type": "object",
+                    "properties": {
+                      "expectedMonthlyCost": { "type": "number", "example": 45.67 },
+                      "grundpreis": { "type": "number", "example": 18.10 },
+                      "arbeitspreis": { "type": "number", "description": "ct/kWh (gross)", "example": 30.21 }
+                    },
+                    "required": ["expectedMonthlyCost", "grundpreis", "arbeitspreis"]
+                  },
+                  "priceComponents": {
+                    "type": "object",
+                    "properties": {
+                      "fixed": {
+                        "type": "object",
+                        "properties": {
+                          "spotmyenergyFee": { "type": "number", "example": 7.554 },
+                          "netznutzungsentgeltGrundpreis": { "type": "number", "example": 10.0 },
+                          "netznutzungsentgeltReduzierung": { "type": "number", "example": 0 },
+                          "valueAddedTax": { "type": "number", "example": 0.19 }
+                        },
+                        "required": ["spotmyenergyFee", "netznutzungsentgeltGrundpreis", "netznutzungsentgeltReduzierung", "valueAddedTax"]
+                      },
+                      "variable": {
+                        "type": "object",
+                        "properties": {
+                          "averageSpotPrice": { "type": "number", "example": 7.8 },
+                          "beschaffungskosten": { "type": "number", "example": 1.0 },
+                          "costAirbag": { "type": "number", "example": 39.0 },
+                          "konzessionsabgabe": { "type": "number", "example": 1.59 },
+                          "kwkUmlage": { "type": "number", "example": 0.227 },
+                          "netznutzungsentgeltArbeitspreis": { "type": "number", "example": 8.64 },
+                          "nevUmlage": { "type": "number", "example": 1.558 },
+                          "offshoreWindUmlage": { "type": "number", "example": 0.816 },
+                          "stromsteuer": { "type": "number", "example": 2.05 },
+                          "valueAddedTax": { "type": "number", "example": 0.19 }
+                        },
+                        "required": ["averageSpotPrice","beschaffungskosten","costAirbag","konzessionsabgabe","kwkUmlage","netznutzungsentgeltArbeitspreis","nevUmlage","offshoreWindUmlage","stromsteuer","valueAddedTax"]
+                      }
+                    },
+                    "required": ["fixed", "variable"]
+                  },
+                  "modul3": {
+                    "type": "object",
+                    "properties": {
+                      "isEligible": { "type": "boolean", "example": true },
+                      "isRecommended": { "type": "boolean", "example": true }
+                    },
+                    "required": ["isEligible", "isRecommended"]
+                  }
+                },
+                "required": ["aggregatedGrossPrices", "priceComponents", "modul3"]
+              }
+            },
+            "required": ["metering", "electricity"]
+          }
+        },
+        "required": ["correlationId", "data"]
+      },
+      "PostProjectRequest": {
+        "type": "object",
+        "properties": {
+          "projectNumberExternal": { "type": "string", "minLength": 1, "example": "PRJ-12345" },
+          "partnerId": { "type": "string", "minLength": 1, "description": "Your partner ID with SpotmyEnergy", "example": "PARTNER-001" },
+          "customer": {
+            "type": "object",
+            "properties": {
+              "salutation": { "type": "string", "enum": ["Herr","Frau","Divers","Familie"] },
+              "firstname": { "type": "string", "minLength": 1, "example": "Max" },
+              "lastname": { "type": "string", "minLength": 1, "example": "Mustermann" },
+              "email": { "type": "string", "format": "email", "example": "max@example.com" },
+              "mobilePhoneNumber": { "type": "string", "example": "+49 170 1234567" },
+              "phoneNumber": { "type": "string", "example": "0221 123456" }
+            },
+            "required": ["salutation", "firstname", "lastname", "email"]
+          },
+          "shippingAddress": {
+            "type": "object",
+            "properties": {
+              "street": { "type": "string", "minLength": 1, "example": "Hafenstraße" },
+              "houseNumber": { "type": "integer", "minimum": 1, "example": 4 },
+              "houseNumberSuffix": { "type": "string", "example": "a" },
+              "zipCode": { "type": "string", "minLength": 1, "example": "51063" },
+              "city": { "type": "string", "minLength": 1, "example": "Köln" }
+            },
+            "required": ["street","houseNumber","zipCode","city"]
+          },
+          "billingAddress": { "$ref": "#/components/schemas/PostProjectRequest/properties/shippingAddress" },
+          "expectedPowerConsumptionKwh": { "type": "number", "minimum": 0, "maximum": 50000, "example": 3500 },
+          "isParagraph14aCase": { "type": "boolean", "examples": [true, false] },
+          "peakSolarPower": { "type": "number", "minimum": 0, "maximum": 25, "example": 10 },
+          "meteringContract": {
+            "type": "object",
+            "properties": { "selected": { "type": "boolean", "example": true } },
+            "required": ["selected"]
+          },
+          "electricityContract": {
+            "type": "object",
+            "properties": {
+              "selected": { "type": "boolean", "example": true },
+              "withModul3": { "type": "boolean", "example": true }
+            },
+            "required": ["selected","withModul3"]
+          }
+        },
+        "required": ["customer","expectedPowerConsumptionKwh","isParagraph14aCase","partnerId","projectNumberExternal","shippingAddress","peakSolarPower","meteringContract","electricityContract"]
+      }
+    }
+  },
+  "security": [{ "BearerAuth": [] }],
+  "paths": {
+    "/contracts/create-offer": {
+      "post": {
+        "summary": "Create Offer",
+        "description": "Create an offer (quote) including metering + electricity pricing for the given site.",
+        "tags": ["Contracts"],
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateOfferRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateOfferResponse" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BadRequestError" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UnauthorizedError" } } } }
+        }
+      }
+    },
+    "/projects": {
+      "post": {
+        "summary": "Create Project (Auftrag)",
+        "description": "Create a new project after the offer has been accepted by the customer.",
+        "tags": ["Projects"],
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PostProjectRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericSuccessId" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BadRequestError" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UnauthorizedError" } } } }
+        }
+      }
+    }
+  }
+}
